@@ -32,8 +32,7 @@ nameplate_events:
     scripts:
         cleanup:
             # In the event of a crash or goof, remove the flag.
-            - foreach <server.players_flagged[nameplate]> as:ply:
-                - flag <[ply]> nameplate:!
+            - flag <server.players_flagged[nameplate]> nameplate:!
             # Remove stray nameplates.
             - if <server.flag[nameplate_cache].any.if_null[false]>:
                 - foreach <server.flag[nameplate_cache]> as:plate:
@@ -41,21 +40,21 @@ nameplate_events:
                     - remove <[plate]>
     events:
         after scripts loaded:
+            - define enabled <script[cfg_nameplate].parsed_key[settings.enabled]>
             - foreach <server.online_players> as:__player:
-                - choose <script[cfg_nameplate].parsed_key[settings.enabled]>:
-                    - case true:
-                        - run nameplate_create
-                        - team name:nonames add:<player.display_name>
-                        - adjust <player.flag[nameplate]> see_through:<script[cfg_nameplate].parsed_key[settings.see_through]>
-                    - case false:
-                        - run nameplate_remove
-                        - team name:nonames remove:<player.display_name>
-            - if not <script[cfg_nameplate].parsed_key[settings.enabled]>:
+                - if <[enabled]>:
+                    - run nameplate_create
+                    - team name:nonames add:<player.display_name>
+                    - adjust <player.flag[nameplate]> see_through:<script[cfg_nameplate].parsed_key[settings.see_through]>
+                - else:
+                    - run nameplate_remove
+                    - team name:nonames remove:<player.display_name>
+            - if !<[enabled]>:
                 - run <script.name>.scripts.cleanup
         on delta time secondly:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
             - foreach <server.online_players> as:__player:
-                - run nameplate_update
+                - inject nameplate_update
         on server start:
             - team name:nonames option:name_tag_visibility status:never
             - team name:nonames option:see_invisible status:never
@@ -63,35 +62,36 @@ nameplate_events:
             - run <script.name>.scripts.cleanup
         after player potion effects modified effect:invisibility:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
-            - run nameplate_update
+            - inject nameplate_update
         on player joins:
-            - if not <script[cfg_nameplate].parsed_key[settings.enabled]>:
+            - if !<script[cfg_nameplate].parsed_key[settings.enabled]>:
                 - team name:nonames remove:<player.display_name>
                 - stop
             - team name:nonames add:<player.display_name>
-            - run nameplate_create
+            - inject nameplate_create
         on player toggles sneaking:
-            - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
-            - define opacity <script[cfg_nameplate].data_key[settings.opacity_default]>
+            - define cfg <script[cfg_nameplate].parsed_key[settings]>
+            - stop if:<[cfg.enabled].not>
+            - define opacity <[cfg.opacity_default]>
             - if <context.state>:
-                - define opacity <script[cfg_nameplate].data_key[settings.opacity_sneak]>
+                - define opacity <[cfg.opacity_sneak]>
             - if <player.has_effect[invisibility]>:
-                - define opacity <script[cfg_nameplate].data_key[settings.opacity_invisible]>
+                - define opacity <[cfg.opacity_invisible]>
             - adjust <player.flag[nameplate]> opacity:<[opacity]>
         on player quits:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
-            - run nameplate_remove
+            - inject nameplate_remove
         # Players forcefully dismount when they touch portals, we're gonna remount them to the player.
         after player enters portal:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
-            - run nameplate_update
+            - inject nameplate_update
 
 nameplate_create:
     type: task
     debug: false
     script:
-        - stop if:<player.is_online.not>
-        - stop if:<player.has_flag[nameplate]>
+        - if !<player.is_online> || <player.has_flag[nameplate]>:
+            - stop
         - spawn nameplate_entity <player.eye_location> save:holo
         - define holo <entry[holo].spawned_entity>
         - flag SERVER nameplate_cache:->:<[holo]>
@@ -100,7 +100,7 @@ nameplate_create:
         - flag <player> nameplate:<[holo]>
         - define see_through <script[cfg_nameplate].parsed_key[settings.see_through]>
         - adjust <[holo]> see_through:<[see_through]>
-        - run nameplate_update
+        - inject nameplate_update
 
 nameplate_update:
     type: task
@@ -108,26 +108,26 @@ nameplate_update:
     definitions: text
     script:
 
-        - stop if:<player.is_online.not>
-        - stop if:<player.has_flag[nameplate].not>
-        - stop if:<player.flag[nameplate].is_spawned.not>
+        - if !<player.is_online> || <player.has_flag[nameplate].not> || !<player.flag[nameplate].is_spawned||true>:
+            - stop
 
-        - define txt <script[cfg_nameplate].parsed_key[settings.text]>
+        - define cfg <script[cfg_nameplate].parsed_key[settings]>
+        - define txt <[cfg.text]>
         - define txt <[text]> if:<[text].exists>
 
         - define holo <player.flag[nameplate]>
-        - if not <[holo].is_spawned>:
-            - run nameplate_remove
-            - run nameplate_create
+        - if !<[holo].is_spawned>:
+            - inject nameplate_remove
+            - inject nameplate_create
             - stop
         # Prevent problems with nameplate being in a different world for some reason.
         - if <player.location.world> != <[holo].location.world> or <[holo].location.distance[<player.location>]> > 2:
             - mount <[holo]> CANCEL
             # Mount actually teleports to the player regardless of world.
             - mount <[holo]>|<player>
-        - define opacity <script[cfg_nameplate].data_key[settings.opacity_default]>
-        - define opacity <script[cfg_nameplate].data_key[settings.opacity_sneak]> if:<player.is_sneaking>
-        - define opacity <script[cfg_nameplate].data_key[settings.opacity_invisible]> if:<player.has_effect[INVISIBILITY]>
+        - define opacity <[cfg.opacity_default]>
+        - define opacity <[cfg.opacity_sneak]> if:<player.is_sneaking>
+        - define opacity <[cfg.opacity_invisible]> if:<player.has_effect[INVISIBILITY]>
         - adjust <[holo]> opacity:<[opacity]>
         - adjust <[holo]> text:<[txt]>
 
