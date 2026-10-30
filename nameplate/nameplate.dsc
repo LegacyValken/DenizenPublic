@@ -62,6 +62,7 @@ nameplate_events:
             - flag SERVER nameplate_cache:<list> if:<server.has_flag[nameplate_cache].not>
             - run <script.name>.scripts.cleanup
         after player potion effects modified effect:invisibility:
+            - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
             - run nameplate_update
         on player joins:
             - if not <script[cfg_nameplate].parsed_key[settings.enabled]>:
