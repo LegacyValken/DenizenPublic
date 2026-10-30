@@ -65,7 +65,9 @@ nameplate_events:
         after player potion effects modified effect:invisibility:
             - run nameplate_update
         on player joins:
-            - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
+            - if not <script[cfg_nameplate].parsed_key[settings.enabled]>:
+                - team name:nonames remove:<player.display_name>
+                - stop
             - team name:nonames add:<player.display_name>
             - run nameplate_create
         on player toggles sneaking:
