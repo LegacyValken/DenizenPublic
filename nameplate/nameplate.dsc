@@ -26,7 +26,6 @@ nameplate_entity:
         background_color: TRANSPARENT
         translation: 0,0.3,0
 
-
 nameplate_events:
     type: world
     debug: false
@@ -77,9 +76,7 @@ nameplate_events:
                 - define opacity <script[cfg_nameplate].data_key[settings.opacity_sneak]>
             - if <player.has_effect[invisibility]>:
                 - define opacity <script[cfg_nameplate].data_key[settings.opacity_invisible]>
-
             - adjust <player.flag[nameplate]> opacity:<[opacity]>
-
         on player quits:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
             - run nameplate_remove
