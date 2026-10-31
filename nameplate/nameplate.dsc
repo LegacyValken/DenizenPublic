@@ -46,12 +46,20 @@ nameplate_events:
                     - case true:
                         - run nameplate_create
                         - team name:nonames add:<player.display_name>
-                        - adjust <player.flag[nameplate]> see_through:<script[cfg_nameplate].parsed_key[settings.see_through]>
                     - case false:
                         - run nameplate_remove
                         - team name:nonames remove:<player.display_name>
+
+                - choose <script[cfg_titles].parsed_key[settings.enabled].if_null[false]>:
+                    - case true:
+                        - run titleplate_create if:<script[cfg_titles].exists>
+                    - case false:
+                        - run titleplate_remove if:<script[cfg_titles].exists>
+
             - if not <script[cfg_nameplate].parsed_key[settings.enabled]>:
                 - run <script.name>.scripts.cleanup
+            - if <script[cfg_titles].exists> and not <script[cfg_titles].parsed_key[settings.enabled].if_null[false]>:
+                - run titles_events.scripts.cleanup
         on delta time secondly:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
             - foreach <server.online_players> as:__player:
@@ -61,6 +69,8 @@ nameplate_events:
             - team name:nonames option:see_invisible status:never
             - flag SERVER nameplate_cache:<list> if:<server.has_flag[nameplate_cache].not>
             - run <script.name>.scripts.cleanup
+            - if <script[cfg_titles].exists>:
+                - run titles_events.scripts.cleanup
         after player potion effects modified effect:invisibility:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
             - run nameplate_update
@@ -69,7 +79,14 @@ nameplate_events:
                 - team name:nonames remove:<player.display_name>
                 - stop
             - team name:nonames add:<player.display_name>
+
             - run nameplate_create
+            - if <script[cfg_titles].exists> and <script[cfg_titles].parsed_key[settings.enabled]>:
+                - if not <player.has_flag[titles]>:
+                    - flag <player> titles:<list[<script[cfg_titles].data_key[settings.default_title]>]>
+                    - flag <player> title:<script[cfg_titles].data_key[settings.default_title]>
+                - run titleplate_create
+
         on player toggles sneaking:
             - stop if:<script[cfg_nameplate].parsed_key[settings.enabled].not>
             - define opacity <script[cfg_nameplate].data_key[settings.opacity_default]>
@@ -91,7 +108,9 @@ nameplate_create:
     debug: false
     script:
         - stop if:<player.is_online.not>
-        - stop if:<player.has_flag[nameplate]>
+        - if <player.has_flag[nameplate]>:
+            - run nameplate_update
+            - stop
         - spawn nameplate_entity <player.eye_location> save:holo
         - define holo <entry[holo].spawned_entity>
         - flag SERVER nameplate_cache:->:<[holo]>
@@ -102,6 +121,9 @@ nameplate_create:
         - adjust <[holo]> see_through:<[see_through]>
         - run nameplate_update
 
+        - if <script[cfg_titles].exists> and <script[cfg_titles].parsed_key[settings.enabled]>:
+            - run titleplate_create
+
 nameplate_update:
     type: task
     debug: false
@@ -111,6 +133,11 @@ nameplate_update:
         - stop if:<player.is_online.not>
         - stop if:<player.has_flag[nameplate].not>
         - stop if:<player.flag[nameplate].is_spawned.not>
+
+        - define name_trans 0,0.3,0
+        - if <script[cfg_titles].parsed_key[settings.enabled].if_null[false]> and <script[cfg_titles].data_key[settings.position]> == bottom and <player.has_flag[title]>:
+            - define name_trans 0,0.6,0
+        - adjust <player.flag[nameplate]> translation:<[name_trans]>
 
         - define txt <script[cfg_nameplate].parsed_key[settings.text]>
         - define txt <[text]> if:<[text].exists>
@@ -131,12 +158,17 @@ nameplate_update:
         - adjust <[holo]> opacity:<[opacity]>
         - adjust <[holo]> text:<[txt]>
 
+        - if <script[cfg_titles].exists>:
+            - run titleplate_update
+
 nameplate_remove:
     type: task
     debug: false
     script:
         - stop if:<player.has_flag[nameplate].not>
         - flag SERVER nameplate_cache:<-:<player.flag[nameplate]>
-        - mount <player.flag[nameplate]> CANCEL
         - remove <player.flag[nameplate]>
         - flag <player> nameplate:!
+
+        - if <script[cfg_titles].exists>:
+            - run titleplate_remove
